@@ -2,7 +2,9 @@ import { clearState, getState } from "../utils/redisUtils.js";
 import dotenv from "dotenv";
 dotenv.config();
 
-// await clearState(1297531770);
+//console.log((await getState(1297531770)));
+
+await clearState(1297531770);
 
 // const state = await getState(1297531770);
 

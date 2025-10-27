@@ -9,6 +9,7 @@ const qdrant = new QdrantClient({
     url: process.env.QDRANT_DB_URL,
     
     apiKey: process.env.QDRANT_DB_API_KEY
+
 });
   
 const openai = new OpenAI({ apiKey: process.env.OPEN_AI_API_KEY });
@@ -182,6 +183,50 @@ async function seedRetrievePrivateKey() {
 
 };
 
+
+async function seedMintTokenCommand() {
+
+    const text = process.env.MINT_TOKEN_EMBEDDING_TEXT;
+
+    const embeddingResp = await openai.embeddings.create({
+
+        model: "text-embedding-3-small",
+        
+        input: text
+    
+    });
+
+    const vector = embeddingResp.data[0].embedding;
+
+    await qdrant.upsert(collectionName, {
+
+        points: [
+
+            {
+
+                id: 3,
+
+                vector: { default: vector },
+
+                payload: {
+
+                    command_id: 3,
+
+                    command_name: "mint_token",
+
+                    schema: { command: "mint_token", name: "", symbol: "", decimals: "", initial_amount: "" },
+                    
+                    embedding_text: text
+                }
+            }
+        ]
+
+    });
+
+    console.log("Seeded mint token command into Qdrant DB.");
+
+};
+
 //await seedCreateWalletCommand().catch(console.error);
 
 // await testEmbedding();
@@ -191,3 +236,5 @@ async function seedRetrievePrivateKey() {
 // await testRetrieval();
 
 // await seedRetrievePrivateKey();
+
+await seedMintTokenCommand();

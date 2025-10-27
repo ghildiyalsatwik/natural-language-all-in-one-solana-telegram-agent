@@ -9,6 +9,8 @@ import { createWallet } from "./handlers/createWallet.js";
 import { setState, getState, clearState } from "./utils/redisUtils.js";
 import { getUserIntentSessionLLM } from "./utils/getUserIntentSessionLLM.js";
 import { handleEject } from "./handlers/handleEject.js";
+import { mintToken } from "./handlers/mintToken.js";
+import { getMintTokenProgressLLM } from "./utils/getMintTokenProgressLLM.js";
 
 const app = express();
 
@@ -195,6 +197,85 @@ app.post('/webhook', async (req, res) => {
             return res.sendStatus(200);
         }
 
+        if(stage === "collecting_parameters" && state.current_intent === "mint_token") {
+            
+            const result = await getMintTokenProgressLLM(userMessage, userId);
+          
+            if(result.command === "none") {
+              
+                await axios.post(BOT_URL, {
+                
+                    chat_id: chatId,
+                
+                    text: "That doesn't seem related to token minting — please provide the missing details.",
+              
+                });
+              
+                return res.sendStatus(200);
+            }
+
+            const prevCollected = state?.collected || {
+                
+                name: "",
+                
+                symbol: "",
+                
+                decimals: "",
+                
+                initial_amount: "",
+              
+            };
+
+
+            await setState(userId, {
+                
+                ...state,
+                
+                current_intent: "mint_token",
+                
+                stage: "collecting_parameters",
+                
+                collected: { ...prevCollected, ...result.updated_fields },
+              
+            });
+          
+            if(result.complete) {
+              
+                await clearState(userId);
+          
+                const { name, symbol, decimals, initial_amount } = {
+                    
+                    ...prevCollected,
+                    
+                    ...result.updated_fields,
+                  
+                };
+              
+                await axios.post(BOT_URL, {
+                
+                    chat_id: chatId,
+                
+                    text: "Minting your token...",
+              
+                });
+          
+                const reply = await mintToken(userId, name, symbol, decimals, initial_amount);
+              
+                await axios.post(BOT_URL, { chat_id: chatId, text: reply });
+              
+                return res.sendStatus(200);
+            
+            }
+            
+            if(result.ask_user) {
+              
+                await axios.post(BOT_URL, { chat_id: chatId, text: result.ask_user });
+            
+            }
+          
+            return res.sendStatus(200);
+        }
+
     }
     
     
@@ -244,6 +325,61 @@ app.post('/webhook', async (req, res) => {
 
         return res.sendStatus(200);
 
+    } else if(context.command_name === "mint_token") {
+
+        await setState(userId, {
+            
+            current_intent: "mint_token",
+            
+            stage: "collecting_parameters",
+            
+            collected: { name: "", symbol: "", decimals: "", initial_amount: "" },
+          
+        });
+        
+        const result = await getMintTokenProgressLLM(userMessage, userId);
+        
+        if(result.command === "none") {
+        
+            await axios.post(BOT_URL, {
+              
+                chat_id: chatId,
+              
+                text: "That doesn't look related to token minting — please try again.",
+            
+            });
+            
+            return res.sendStatus(200);
+          
+        }
+          
+        await setState(userId, {
+            
+            current_intent: "mint_token",
+            
+            stage: "collecting_parameters",
+            
+            collected: result.updated_fields,
+          
+        });
+        
+        if(result.complete) {
+
+            const { name, symbol, decimals, initial_amount } = result.updated_fields;
+            
+            const reply = await mintToken(userId, name, symbol, decimals, initial_amount);
+            
+            await axios.post(BOT_URL, { chat_id: chatId, text: reply });
+            
+            await clearState(userId);
+        
+        } else {
+            
+            await axios.post(BOT_URL, { chat_id: chatId, text: result.ask_user });
+        }
+        
+        return res.sendStatus(200);
+    
     }
 
     const reply = handleDefaultOrError(userId);
