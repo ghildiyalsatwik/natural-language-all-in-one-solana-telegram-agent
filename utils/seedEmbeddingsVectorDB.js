@@ -139,6 +139,49 @@ async function testRetrieval() {
     console.log("Similarity score:", searchResults[0].score);
 }
 
+async function seedRetrievePrivateKey() {
+
+    const text = process.env.EJECT_PROMPT;
+
+    const embeddingResp = await openai.embeddings.create({
+
+        model: "text-embedding-3-small",
+        
+        input: text
+    
+    });
+
+    const vector = embeddingResp.data[0].embedding;
+
+    await qdrant.upsert(collectionName, {
+
+        points: [
+
+            {
+
+                id: 2,
+
+                vector: { default: vector },
+
+                payload: {
+
+                    command_id: 2,
+
+                    command_name: "eject",
+
+                    schema: { command: "eject" },
+                    
+                    embedding_text: text
+                }
+            }
+        ]
+
+    });
+
+    console.log("Seeded retrieve private key command into Qdrant DB.");
+
+};
+
 //await seedCreateWalletCommand().catch(console.error);
 
 // await testEmbedding();
@@ -146,3 +189,5 @@ async function testRetrieval() {
 // await deleteCollection();
 
 // await testRetrieval();
+
+// await seedRetrievePrivateKey();

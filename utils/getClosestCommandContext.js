@@ -21,7 +21,7 @@ export async function getClosestCommandContext(userMessage) {
           
             name: "default",
           
-          vector: queryVector,
+            vector: queryVector,
         
         },
         
@@ -32,6 +32,10 @@ export async function getClosestCommandContext(userMessage) {
     if (!searchResults.length) return null;
 
     const top = searchResults[0];
+
+    console.log(top.payload.command_name);
+    
+    console.log(top.score);
     
     return {
         
